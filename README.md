@@ -38,9 +38,20 @@ exclude 10% tax and the 6% platform fee:
 | CAT 6 A/B | Numbered seat, restricted view | Rp1.850.000 |
 | CAT 7 A/B | Numbered seat, restricted view | Rp1.550.000 |
 
+Where each category sits follows the official seat map:
+
+- **Floor:** the main stage at one end with three runways fanning out to a platform. The two
+  Ultimate VIP pens are between the runways, Diamond VIP is on either side of them, and Gold
+  VIP is at the back around the sound desk (FOH) and delay towers.
+- **Lower tier:** CAT 1 A/B on the sides level with the runways, CAT 6 A/B beside the stage,
+  and CAT 2 everywhere else.
+- **Middle tier:** CAT 3 all the way round, with CAT 6 A/B beside the stage.
+- **Upper tier:** CAT 5 A/B on the sides nearer the stage, CAT 7 A/B beside the stage, and
+  CAT 4 at the far end and the far half of the sides.
+- **Behind the stage:** not on sale.
+
 The stadium shell uses JIS's published figures: three tiers raked at 24°, 29° and 32°, about
-82,000 seats, and a retractable roof. Where each category sits, plus the section numbers, row
-counts and the stage design, are **illustrative estimates**, not the official seat plan.
-Check the promoter's seat plan before buying.
+82,000 seats, and a retractable roof. Exact block edges, section numbers, row counts and stage
+sizes are **estimates**, so confirm your seat against the official map.
 
 Not affiliated with YG Entertainment, PK Entertainment or Jakarta International Stadium.

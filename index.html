@@ -183,7 +183,7 @@ input[type=range]{width:100%;min-width:0;accent-color:var(--crown)}
     <div class="rest" id="panelRest">
       <dl class="stats" id="stats">
         <div><dt>Main stage</dt><dd id="s-stage">–</dd></div>
-        <div><dt>B-stage</dt><dd id="s-bstage">–</dd></div>
+        <div><dt>Runway</dt><dd id="s-run">–</dd></div>
         <div><dt>Eye height</dt><dd id="s-height">–</dd></div>
         <div><dt>Off centre</dt><dd id="s-angle">–</dd></div>
         <div><dt>Main screen</dt><dd id="s-main">–</dd></div>
@@ -202,7 +202,7 @@ input[type=range]{width:100%;min-width:0;accent-color:var(--crown)}
         <h3 id="h-cats">Ticket categories</h3>
         <ul class="cats" id="catList"></ul>
       </section>
-      <p class="fine">Fan-made and unofficial; not affiliated with YG Entertainment, PK Entertainment or Jakarta International Stadium. Categories and prices follow the September 2026 announcement and exclude 10% tax and the 6% platform fee. Section positions, row counts and the stage design are illustrative, so check the official seat plan before you buy. The stadium shell uses JIS's published figures: three tiers raked at 24°, 29° and 32°, about 82,000 seats, and a retractable roof.</p>
+      <p class="fine">Fan-made and unofficial; not affiliated with YG Entertainment, PK Entertainment or Jakarta International Stadium. Categories, prices and where each category sits follow the official seat map (prices exclude 10% tax and the 6% platform fee). Exact block edges, section numbers, row counts and stage sizes are estimates, so use the official map to confirm your seat. The stadium shell uses JIS's published figures: three tiers raked at 24°, 29° and 32°, about 82,000 seats, and a retractable roof.</p>
     </div>
   </div>
 </aside>
@@ -226,16 +226,16 @@ const narrow=()=>innerWidth<=760;
 /* Ticket categories (PK Entertainment, Sept 2026; prices before tax)  */
 /* ------------------------------------------------------------------ */
 const CATS={
-  UVIP:{name:'Ultimate VIP',price:6500000,kind:'Standing',where:'Floor pens at the stage barrier, either side of the runway',color:'#ffd21f'},
-  DVIP:{name:'Diamond VIP',price:6000000,kind:'Numbered seat',where:'Floor seats around the B-stage',color:'#cfe9ff'},
-  GVIP:{name:'Gold VIP',price:5500000,kind:'Numbered seat',where:'Rear floor seats',color:'#d9a23a'},
-  CAT1:{name:'CAT 1',ab:true,price:4750000,kind:'Numbered seat',where:'Lower tier, long sides',color:'#ff6b5a'},
-  CAT2:{name:'CAT 2',price:3750000,kind:'Numbered seat',where:'Lower tier, facing the stage',color:'#ff9f43'},
-  CAT3:{name:'CAT 3',price:2850000,kind:'Numbered seat',where:'Middle tier, long sides',color:'#a08cff'},
-  CAT4:{name:'CAT 4',price:2550000,kind:'Numbered seat',where:'Middle tier, facing the stage',color:'#4fc3f7'},
-  CAT5:{name:'CAT 5',ab:true,price:2250000,kind:'Numbered seat',where:'Upper tier, sides and far end',color:'#5ed6a0'},
-  CAT6:{name:'CAT 6',ab:true,restricted:true,price:1850000,kind:'Numbered seat',where:'Side sections next to the stage, all tiers',color:'#f78fd1'},
-  CAT7:{name:'CAT 7',ab:true,restricted:true,price:1550000,kind:'Numbered seat',where:'Stage-side corners, all tiers',color:'#b4bccb'},
+  UVIP:{name:'Ultimate VIP',price:6500000,kind:'Standing',where:'Two pens between the runways, right at the stage',color:'#fd0000'},
+  DVIP:{name:'Diamond VIP',price:6000000,kind:'Numbered seat',where:'Floor seats either side of the runways',color:'#fe86d5'},
+  GVIP:{name:'Gold VIP',price:5500000,kind:'Numbered seat',where:'Rear floor seats around the sound desk (FOH)',color:'#fe9126'},
+  CAT1:{name:'CAT 1',ab:true,price:4750000,kind:'Numbered seat',where:'Lower tier, sides level with the runways',color:'#fe7278'},
+  CAT2:{name:'CAT 2',price:3750000,kind:'Numbered seat',where:'Lower tier, far end and far half of the sides',color:'#3a65e7'},
+  CAT3:{name:'CAT 3',price:2850000,kind:'Numbered seat',where:'Middle tier, all the way round',color:'#fcd631'},
+  CAT4:{name:'CAT 4',price:2550000,kind:'Numbered seat',where:'Upper tier, far end and far half of the sides',color:'#27f47e'},
+  CAT5:{name:'CAT 5',ab:true,price:2250000,kind:'Numbered seat',where:'Upper tier, sides nearer the stage',color:'#a025d4'},
+  CAT6:{name:'CAT 6',ab:true,restricted:true,price:1850000,kind:'Numbered seat',where:'Lower and middle tiers beside the stage',color:'#fb19f2'},
+  CAT7:{name:'CAT 7',ab:true,restricted:true,price:1550000,kind:'Numbered seat',where:'Upper tier beside the stage',color:'#26b9f4'},
   CLOSED:{name:'Closed',price:0,kind:'Not on sale',where:'Behind the stage',color:'#24272e'}
 };
 const CAT_ORDER=['UVIP','DVIP','GVIP','CAT1','CAT2','CAT3','CAT4','CAT5','CAT6','CAT7'];
@@ -305,12 +305,25 @@ const TIERS=[
 TIERS.forEach(t=>{t.rise=t.depth*Math.tan(t.rake*D2R);t.dBack=t.d0+t.rows*t.depth;t.yTop=t.y0+(t.rows-1)*t.rise;});
 const soffitY=(t,d)=>t.y0-1.6+(d-t.d0)*Math.tan(t.rake*D2R);
 
-/* Stage landmarks */
+/* Stage landmarks, laid out after the official seat map: main stage at one end, three runways
+   fanning out to a platform with the Ultimate VIP pens between them, and the sound desk (FOH)
+   with delay towers among the Gold VIP seats. Dimensions are estimates. */
 const STAGE_FRONT=new THREE.Vector3(0,2.2,-38);
-const BSTAGE=new THREE.Vector3(0,1.5,10);
-const MAIN_SCREEN={c:new THREE.Vector3(0,14,-51.9),w:34,h:17,n:new THREE.Vector3(0,0,1)};
+const MAIN_SCREEN={c:new THREE.Vector3(0,14,-55.4),w:34,h:17,n:new THREE.Vector3(0,0,1)};
 const SIDE_ROT=25*D2R;
-const SIDE_SCREENS=[-1,1].map(s=>({c:new THREE.Vector3(29*s,15,-44),w:11,h:17,rot:s*SIDE_ROT,n:new THREE.Vector3(Math.sin(s*SIDE_ROT),0,Math.cos(s*SIDE_ROT))}));
+const SIDE_SCREENS=[-1,1].map(s=>({c:new THREE.Vector3(31*s,15,-45),w:11,h:17,rot:s*SIDE_ROT,n:new THREE.Vector3(Math.sin(s*SIDE_ROT),0,Math.cos(s*SIDE_ROT))}));
+const APEX={x:0,z:-10,half:4.5};
+const RUNWAY_W=3;
+const RUNWAYS=[-22,0,22].map(x=>({x0:x,z0:-38,x1:APEX.x,z1:APEX.z}));
+const FOH={x0:-8,x1:8,z0:25,z1:31};
+const TOWERS=[[-23,14.5],[23,14.5],[-10.5,32.5],[10.5,32.5]];
+function segDist(px,pz,r){const dx=r.x1-r.x0,dz=r.z1-r.z0,t=clamp(((px-r.x0)*dx+(pz-r.z0)*dz)/(dx*dx+dz*dz),0,1);return Math.hypot(px-(r.x0+dx*t),pz-(r.z0+dz*t));}
+function runwayDist(p){
+  const arm=Math.min(...RUNWAYS.map(r=>segDist(p.x,p.z,r)))-RUNWAY_W/2;
+  const ax=Math.max(0,Math.abs(p.x-APEX.x)-APEX.half),az=Math.max(0,Math.abs(p.z-APEX.z)-APEX.half);
+  return Math.max(0,Math.min(arm,Math.hypot(ax,az)));
+}
+function inPoly(x,z,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;}
 
 /* ------------------------------------------------------------------ */
 /* Sections                                                           */
@@ -319,19 +332,20 @@ const SECTIONS=[];
 const SEC_BY_ID={};
 function zoneList(){
   const out=[];
-  const split=(p,n,zone)=>{for(let i=0;i<n;i++) out.push({u0:p.u0+p.len*i/n,u1:p.u0+p.len*(i+1)/n,zone:typeof zone==='function'?zone(i):zone});};
-  split(pieces[0],2,'end'); split(pieces[1],1,'farCorner'); split(pieces[2],6,i=>i===5?'sideNear':'side');
+  const split=(p,n,zone)=>{for(let i=0;i<n;i++) out.push({u0:p.u0+p.len*i/n,u1:p.u0+p.len*(i+1)/n,zone});};
+  split(pieces[0],2,'end'); split(pieces[1],1,'farCorner'); split(pieces[2],6,'side');
   split(pieces[3],1,'stageCorner'); split(pieces[4],3,'behind'); split(pieces[5],1,'stageCorner');
-  split(pieces[6],6,i=>i===0?'sideNear':'side'); split(pieces[7],1,'farCorner'); split(pieces[8],2,'end');
+  split(pieces[6],6,'side'); split(pieces[7],1,'farCorner'); split(pieces[8],2,'end');
+  // long sides: far half, level with the runways, or beside the stage
+  out.forEach(z=>{if(z.zone==='side'){const c=ring((z.u0+z.u1)/2,0).z;z.zone=c>0?'sideFar':c>-32?'sideMid':'sideNear';}});
   return out;
 }
+/* Category placement follows the official seat map */
 function catFor(tier,zone){
-  if(zone==='behind') return 'CLOSED';
-  if(zone==='stageCorner') return 'CAT7';
-  if(zone==='sideNear') return 'CAT6';
-  if(tier===1) return zone==='side'?'CAT1':'CAT2';
-  if(tier===2) return zone==='side'?'CAT3':'CAT4';
-  return 'CAT5';
+  if(zone==='behind'||zone==='stageCorner') return 'CLOSED';
+  if(tier===1) return zone==='sideNear'?'CAT6':zone==='sideMid'?'CAT1':'CAT2';
+  if(tier===2) return zone==='sideNear'?'CAT6':'CAT3';
+  return zone==='sideNear'?'CAT7':zone==='sideMid'?'CAT5':'CAT4';
 }
 const SEAT_W=0.5,AISLE=0.7;
 const ZONES=zoneList();
@@ -350,28 +364,25 @@ TIERS.forEach(t=>ZONES.forEach((z,j)=>{
   SECTIONS.push(s);SEC_BY_ID[id]=s;
 }));
 
+/* Floor blocks as plan polygons [x,z]; seats fill each polygon on a grid */
 const FLOOR_DEF=[
-  {id:'UVIP-L',title:'Left pen',cat:'UVIP',standing:true,x0:-30,x1:-3.2,z0:-35,z1:-12},
-  {id:'UVIP-R',title:'Right pen',cat:'UVIP',standing:true,x0:3.2,x1:30,z0:-35,z1:-12},
-  {id:'D1',title:'Block D1',cat:'DVIP',x0:-30,x1:-16,z0:-9,z1:14},
-  {id:'D2',title:'Block D2',cat:'DVIP',x0:-14,x1:-3.2,z0:-9,z1:14},
-  {id:'D3',title:'Block D3',cat:'DVIP',x0:3.2,x1:14,z0:-9,z1:14},
-  {id:'D4',title:'Block D4',cat:'DVIP',x0:16,x1:30,z0:-9,z1:14},
-  {id:'G1',title:'Block G1',cat:'GVIP',x0:-32,x1:-17,z0:17,z1:47},
-  {id:'G2',title:'Block G2',cat:'GVIP',x0:-15,x1:-1,z0:17,z1:47},
-  {id:'G3',title:'Block G3',cat:'GVIP',x0:1,x1:15,z0:17,z1:47},
-  {id:'G4',title:'Block G4',cat:'GVIP',x0:17,x1:32,z0:17,z1:47}
+  {id:'UVIP-L',title:'Left pen',cat:'UVIP',standing:true,poly:[[-17.1,-36],[-2.6,-36],[-2.6,-17.5]]},
+  {id:'UVIP-R',title:'Right pen',cat:'UVIP',standing:true,poly:[[2.6,-36],[17.1,-36],[2.6,-17.5]]},
+  {id:'DVIP-L',title:'Left block',cat:'DVIP',poly:[[-37,-36],[-23.7,-36],[-6.5,-14.1],[-6.5,-3.5],[-1,-3.5],[-1,13],[-37,13]]},
+  {id:'DVIP-R',title:'Right block',cat:'DVIP',poly:[[37,-36],[23.7,-36],[6.5,-14.1],[6.5,-3.5],[1,-3.5],[1,13],[37,13]]},
+  {id:'GVIP-L',title:'Left block',cat:'GVIP',poly:[[-37,16],[-1,16],[-1,50],[-37,50]]},
+  {id:'GVIP-R',title:'Right block',cat:'GVIP',poly:[[1,16],[37,16],[37,50],[1,50]]}
 ];
-const FOH={x0:-5,x1:5,z0:30,z1:35};
-const floorBlocked=(x,z)=>Math.hypot(x,z-BSTAGE.z)<9.5||(x>FOH.x0-0.8&&x<FOH.x1+0.8&&z>FOH.z0-0.8&&z<FOH.z1+0.8);
+const floorBlocked=(x,z)=>(x>FOH.x0-1&&x<FOH.x1+1&&z>FOH.z0-1&&z<FOH.z1+1)||TOWERS.some(t=>Math.abs(x-t[0])<2.2&&Math.abs(z-t[1])<2.2);
 FLOOR_DEF.forEach(f=>{
   const s=Object.assign({kind:'floor',side:'',rows:[]},f);
+  const xs=f.poly.map(p=>p[0]),zs=f.poly.map(p=>p[1]);
+  s.x0=Math.min(...xs);s.x1=Math.max(...xs);s.z0=Math.min(...zs);s.z1=Math.max(...zs);
   const pz=f.standing?1:0.95,w=f.standing?1:0.55;
-  const nr=Math.floor((f.z1-f.z0)/pz),ns=Math.floor((f.x1-f.x0)/w);
-  for(let r=0;r<nr;r++){
-    const z=f.z0+(r+0.5)*pz,xs=[];
-    for(let i=0;i<ns;i++){const x=f.x0+(i+0.5)*w; if(!floorBlocked(x,z)) xs.push(x,0,z);}
-    if(xs.length) s.rows.push(new Float32Array(xs));
+  for(let z=s.z0+pz/2;z<s.z1;z+=pz){
+    const row=[];
+    for(let x=s.x0+w/2;x<s.x1;x+=w) if(inPoly(x,z,f.poly)&&!floorBlocked(x,z)) row.push(x,0,z);
+    if(row.length) s.rows.push(new Float32Array(row));
   }
   SECTIONS.push(s);SEC_BY_ID[s.id]=s;
 });
@@ -491,10 +502,10 @@ SECTIONS.filter(s=>s.kind==='stand').forEach(s=>{
 
 /* Floor blocks, tinted by category */
 SECTIONS.filter(s=>s.kind==='floor').forEach(s=>{
-  const g=new THREE.PlaneGeometry(s.x1-s.x0,s.z1-s.z0); g.rotateX(-Math.PI/2);
+  const g=new THREE.ShapeGeometry(new THREE.Shape(s.poly.map(p=>new THREE.Vector2(p[0],-p[1])))); g.rotateX(-Math.PI/2);
   const col=new THREE.Color(0x1d2026).lerp(new THREE.Color(CATS[s.cat].color),0.5);
-  const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:col,emissive:0x000000}));
-  m.position.set((s.x0+s.x1)/2,0.03,(s.z0+s.z1)/2); s.mesh=m; scene.add(m);
+  const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:col,emissive:0x000000,side:THREE.DoubleSide}));
+  m.position.y=0.03; s.mesh=m; scene.add(m);
 });
 
 /* Box windows between middle and upper tiers (JIS has 52 corporate boxes) */
@@ -578,23 +589,31 @@ const stageGroup=new THREE.Group(); scene.add(stageGroup);
 const blackMat=new THREE.MeshLambertMaterial({color:0x0d0e10});
 const steelMat=new THREE.MeshLambertMaterial({color:0x3a3d44});
 function box(w,h,d,x,y,z,mat,obst){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);stageGroup.add(m);if(obst)obstacles.push(m);return m;}
-box(64,2.2,18,0,1.1,-47,blackMat);
-box(66,30,1.2,0,15,-59,blackMat);
-box(35.2,18.2,0.6,0,14,-52.3,blackMat,true);
-box(70,1.6,19,0,27.2,-47.5,steelMat,true);
-[[-33.5,-56.5],[33.5,-56.5],[-33.5,-38.8],[33.5,-38.8]].forEach(p=>box(1.2,26.4,1.2,p[0],13.2,p[1],steelMat,true));
-[-1,1].forEach(s=>{box(1.4,10,1.4,s*37.5,19,-40,blackMat,true);box(0.2,8,0.2,s*37.5,28,-40,steelMat);});
-box(4,1.5,41,0,0.75,-17.5,blackMat);
-const bst=new THREE.Mesh(new THREE.CylinderGeometry(7,7,1.5,48),blackMat); bst.position.set(BSTAGE.x,0.75,BSTAGE.z); stageGroup.add(bst);
-box(FOH.x1-FOH.x0,2.8,FOH.z1-FOH.z0,(FOH.x0+FOH.x1)/2,1.4,(FOH.z0+FOH.z1)/2,new THREE.MeshLambertMaterial({color:0x1a1c21}),true);
-// stage-edge LED lines
+box(48,2.2,19,0,1.1,-47.5,blackMat);
+box(54,30,1.2,0,15,-59.6,blackMat);
+box(35.2,18.2,0.6,0,14,-55.8,blackMat,true);
+box(62,1.6,19,0,27.2,-48,steelMat,true);
+[[-29.5,-57],[29.5,-57],[-29.5,-39.2],[29.5,-39.2]].forEach(p=>box(1.2,26.4,1.2,p[0],13.2,p[1],steelMat,true));
+[-1,1].forEach(s=>{box(1.4,10,1.4,s*21.5,19,-38.9,blackMat,true);box(0.2,7,0.2,s*21.5,27.5,-38.9,steelMat);});
+// three runways fanning out from the stage to the platform
 const edgeMat=new THREE.MeshBasicMaterial({color:0xdedede});
-box(64,0.18,0.1,0,2.1,-37.95,edgeMat); box(0.1,0.12,41,-2.02,1.45,-17.5,edgeMat); box(0.1,0.12,41,2.02,1.45,-17.5,edgeMat);
-const bRing=new THREE.Mesh(new THREE.RingGeometry(6.2,7,64),new THREE.MeshBasicMaterial({color:0xffd21f,side:THREE.DoubleSide}));
-bRing.rotation.x=-Math.PI/2; bRing.position.set(BSTAGE.x,1.52,BSTAGE.z); stageGroup.add(bRing);
-// barriers
+RUNWAYS.forEach(r=>{
+  const dx=r.x1-r.x0,dz=r.z1-r.z0,len=Math.hypot(dx,dz),g=new THREE.Group();
+  g.position.set((r.x0+r.x1)/2,0,(r.z0+r.z1)/2); g.rotation.y=Math.atan2(dx,dz);
+  const deck=new THREE.Mesh(new THREE.BoxGeometry(RUNWAY_W,1.5,len),blackMat); deck.position.y=0.75; g.add(deck);
+  [-1,1].forEach(k=>{const e=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.12,len),edgeMat);e.position.set(k*(RUNWAY_W/2+0.02),1.45,0);g.add(e);});
+  stageGroup.add(g);
+});
+box(APEX.half*2,1.5,APEX.half*2,APEX.x,0.75,APEX.z,blackMat);
+const apexMat=new THREE.MeshBasicMaterial({color:0xffd21f});
+[[0,-1,1],[0,1,1],[-1,0,0],[1,0,0]].forEach(e=>{const L=APEX.half*2+0.25;box(e[2]?L:0.25,0.1,e[2]?0.25:L,APEX.x+e[0]*APEX.half,1.52,APEX.z+e[1]*APEX.half,apexMat);});
+box(48,0.18,0.1,0,2.1,-37.95,edgeMat);
+// sound desk and delay towers (the official map warns both can block views)
+const floorObs=[box(FOH.x1-FOH.x0,2.8,FOH.z1-FOH.z0,(FOH.x0+FOH.x1)/2,1.4,(FOH.z0+FOH.z1)/2,new THREE.MeshLambertMaterial({color:0x1a1c21}),true)];
+TOWERS.forEach(t=>{floorObs.push(box(1.6,11,1.6,t[0],5.5,t[1],steelMat,true),box(2.4,3.2,1.8,t[0],12.6,t[1],blackMat,true));});
+// barriers along the pit
 const railMat=new THREE.MeshLambertMaterial({color:0x8a8f99});
-box(26.8,1.1,0.25,-16.6,0.55,-35,railMat); box(26.8,1.1,0.25,16.6,0.55,-35,railMat);
+[-1,1].forEach(k=>{box(14.5,1.1,0.25,k*9.85,0.55,-36.2,railMat);box(13.3,1.1,0.25,k*30.35,0.55,-36.2,railMat);});
 
 /* LED screens: grain-static and three pillars after the tour artwork, a star warp, and the title card */
 const titleCanvas=document.createElement('canvas'); titleCanvas.width=1024; titleCanvas.height=512;
@@ -684,7 +703,7 @@ const crowd=[]; // x, floorY, z, alwaysStanding
 SECTIONS.forEach(s=>{
   if(s.cat==='CLOSED') return;
   if(s.cat==='UVIP'){
-    for(let z=s.z0+0.35;z<s.z1;z+=0.7) for(let x=s.x0+0.35;x<s.x1;x+=0.7) crowd.push(x+(rand()-0.5)*0.4,0,z+(rand()-0.5)*0.4,1);
+    for(let z=s.z0+0.35;z<s.z1;z+=0.7) for(let x=s.x0+0.35;x<s.x1;x+=0.7) if(inPoly(x,z,s.poly)) crowd.push(x+(rand()-0.5)*0.4,0,z+(rand()-0.5)*0.4,1);
     return;
   }
   s.rows.forEach(arr=>{for(let i=0;i<arr.length;i+=3) crowd.push(arr[i],arr[i+1],arr[i+2],0);});
@@ -765,8 +784,9 @@ function lookYawPitch(from,to){
   return {yaw:Math.atan2(-dx,-dz),pitch:Math.atan2(dy,Math.hypot(dx,dz))};
 }
 function povTarget(){
-  // aim between the main screen and the runway, so the stage and the crowd both sit in frame
-  return new THREE.Vector3(0,11,-46);
+  // close to the stage, look at the performers; further back, frame the screens as well
+  const d=Math.hypot(eyePos.x,eyePos.z-STAGE_FRONT.z);
+  return new THREE.Vector3(0,4+7*clamp((d-15)/60,0,1),-44);
 }
 function fovFor(zoom){
   const aspect=camera.aspect||1,h=(narrow()?64:76)*D2R;
@@ -827,7 +847,7 @@ function screenVisibility(scr,mesh){
 }
 function computeFacts(){
   scene.updateMatrixWorld();
-  const dStage=eyePos.distanceTo(STAGE_FRONT),dB=eyePos.distanceTo(BSTAGE),dScr=eyePos.distanceTo(MAIN_SCREEN.c);
+  const dStage=eyePos.distanceTo(STAGE_FRONT),dRun=Math.hypot(runwayDist(eyePos),eyePos.y-1.5),dScr=eyePos.distanceTo(MAIN_SCREEN.c);
   const toEye=eyePos.clone().sub(MAIN_SCREEN.c);
   const off=Math.atan2(Math.abs(toEye.x),toEye.z)/D2R;
   const mainVis=screenVisibility(MAIN_SCREEN);
@@ -835,7 +855,14 @@ function computeFacts(){
   const perfMM=1.75*600/dStage;
   const cosA=Math.max(0,Math.cos(Math.min(off,90)*D2R));
   const tvW=MAIN_SCREEN.w*cosA*2.5/dScr, tvIn=tvW/0.8716/0.0254;
-  return {dStage,dB,height:eyePos.y,off,mainVis,sideVis:side.v,perfMM,tvIn};
+  // does the sound desk or a delay tower sit between this seat and the stage or runways?
+  let floorBlock=false;
+  [STAGE_FRONT,new THREE.Vector3(APEX.x,2,APEX.z),new THREE.Vector3(0,2,-24)].forEach(pt=>{
+    const dir=pt.clone().sub(eyePos),len=dir.length(); dir.normalize();
+    ray.set(eyePos,dir); ray.near=0.05; ray.far=len;
+    if(ray.intersectObjects(floorObs,false).length) floorBlock=true;
+  });
+  return {dStage,dRun,height:eyePos.y,off,mainVis,sideVis:side.v,perfMM,tvIn,floorBlock};
 }
 function verdictFor(f){
   const s=state.sec,out=[];
@@ -848,9 +875,9 @@ function verdictFor(f){
   else if(f.mainVis<0.75) out.push('Part of the main screen is blocked by the stage structure or the tier above.');
   else if(f.off>55) out.push('You see the main screen at a steep angle, so it looks narrow.');
   if(s.kind==='stand'&&s.tier.n===1&&state.row>=21) out.push('The middle tier overhangs these back rows and hides the roof and the sky.');
-  if(s.cat==='UVIP'&&state.row<4) out.push('Right at the barrier, about 3 m from the stage edge.');
-  if(s.cat==='GVIP'&&seatPos.z>FOH.z1&&Math.abs(seatPos.x)<12) out.push('The sound desk (FOH) sits between you and the stage.');
-  if(s.cat==='DVIP') out.push('The B-stage is part of your block, so the members come close mid-show.');
+  if(s.cat==='UVIP') out.push(state.row<3?'You are at the pit barrier, about 2 m from the stage, with runways on both sides of your pen.':'Your pen sits between two runways, so the members pass on both sides.');
+  else if(s.kind==='floor'&&f.dRun<10) out.push('A runway passes within '+Math.max(1,Math.round(f.dRun))+' m of you, so the members come close mid-show.');
+  if(f.floorBlock) out.push('A delay tower or the sound desk (FOH) is in your line of sight, as the official map warns.');
   return out.join(' ');
 }
 
@@ -898,7 +925,7 @@ CAT_ORDER.forEach(k=>{
   b.addEventListener('click',()=>{const r=REP[k];selectSeat(SEC_BY_ID[r[0]],r[1],null,{go:true});});
   li.appendChild(b);ui.cats.appendChild(li);
 });
-const REP={UVIP:['UVIP-R',1],DVIP:['D3',8],GVIP:['G2',6],CAT1:['107',8],CAT2:['101',10],CAT3:['207',6],CAT4:['201',8],CAT5:['306',12],CAT6:['109',10],CAT7:['110',10]};
+const REP={UVIP:['UVIP-L',1],DVIP:['DVIP-R',12],GVIP:['GVIP-L',8],CAT1:['107',8],CAT2:['101',10],CAT3:['206',6],CAT4:['301',10],CAT5:['308',8],CAT6:['109',10],CAT7:['309',10]};
 
 // section dropdown grouped by category
 CAT_ORDER.forEach(k=>{
@@ -921,14 +948,15 @@ const mapSecs={};
       const b=BANDS[s.tier.n],us=sampleU(s.u0+0.35,s.u1-0.35,1.2);
       const inner=us.map(u=>ring(u,b[0])),outer=us.map(u=>ring(u,b[1])).reverse();
       d='M'+inner.concat(outer).map(p=>p.x.toFixed(1)+' '+p.z.toFixed(1)).join('L')+'Z';
-    }else d='M'+s.x0+' '+s.z0+'H'+s.x1+'V'+s.z1+'H'+s.x0+'Z';
+    }else d='M'+s.poly.map(p=>p[0]+' '+p[1]).join('L')+'Z';
     const p=el('path',{d,fill:CATS[s.cat].color,class:'sec'+(s.cat==='CLOSED'?' closed':'')},svg);
     p.dataset.id=s.id; mapSecs[s.id]=p;
   });
-  el('rect',{x:-32,y:-58,width:64,height:20,fill:'#eceef3'},svg);
-  el('text',{x:0,y:-46,'text-anchor':'middle','font-size':6.5,'font-weight':600,fill:'#0b0c0f','letter-spacing':2},svg).textContent='STAGE';
-  el('rect',{x:-2,y:-38,width:4,height:41,fill:'#eceef3'},svg);
-  el('circle',{cx:0,cy:BSTAGE.z,r:7,fill:'#eceef3'},svg);
+  el('rect',{x:-24,y:-57,width:48,height:19,fill:'#eceef3'},svg);
+  el('text',{x:0,y:-45.5,'text-anchor':'middle','font-size':6.5,'font-weight':600,fill:'#0b0c0f','letter-spacing':2},svg).textContent='STAGE';
+  RUNWAYS.forEach(r=>el('line',{x1:r.x0,y1:r.z0,x2:r.x1,y2:r.z1,stroke:'#eceef3','stroke-width':RUNWAY_W},svg));
+  el('rect',{x:APEX.x-APEX.half,y:APEX.z-APEX.half,width:APEX.half*2,height:APEX.half*2,fill:'#eceef3'},svg);
+  TOWERS.forEach(t=>el('rect',{x:t[0]-1.6,y:t[1]-1.6,width:3.2,height:3.2,fill:'#6b707b'},svg));
   el('rect',{x:FOH.x0,y:FOH.z0,width:FOH.x1-FOH.x0,height:FOH.z1-FOH.z0,fill:'#3a3d44'},svg);
   el('text',{x:0,y:(FOH.z0+FOH.z1)/2+1.4,'text-anchor':'middle','font-size':4,fill:'#c9cdd6'},svg).textContent='FOH';
   el('text',{x:-108,y:126,'font-size':7,fill:'#959cab'},svg).textContent='A';
@@ -959,11 +987,11 @@ function hideTip(){ui.tip.hidden=true;}
 
 function updateSliders(){
   const s=state.sec,standing=s.cat==='UVIP';
-  ui.rowLbl.textContent=standing?'Depth':'Row'; ui.seatLbl.textContent=standing?'Across':'Seat';
+  ui.rowLbl.textContent=standing?'Depth':'Row'; ui.seatLbl.textContent=standing?'Spot':'Seat';
   ui.row.max=s.rows.length; ui.row.value=state.row+1;
   ui.seat.max=seatCount(s,state.row); ui.seat.value=state.seat+1;
   ui.rowOut.textContent=standing?(state.row+1)+' m':state.row+1;
-  ui.seatOut.textContent=standing?(state.seat+1)+' m':state.seat+1;
+  ui.seatOut.textContent=state.seat+1;
   ui.sec.value=s.id;
 }
 function setStat(id,html){$('#'+id).innerHTML=html;}
@@ -973,11 +1001,11 @@ function updatePanel(){
   ui.chip.style.background=c.color; ui.cat.textContent=catLabel(s);
   ui.price.textContent=fmtRp(c.price);
   ui.title.textContent=s.kind==='stand'?s.title+' · '+s.tier.name+' tier':secTitle(s);
-  const sub=s.cat==='UVIP'?(state.row+1)+' m behind the barrier · '+(state.seat+1)+' m across':'Row '+(state.row+1)+' of '+s.rows.length+' · Seat '+(state.seat+1);
+  const sub=s.cat==='UVIP'?(state.row+1)+' m behind the barrier · spot '+(state.seat+1):'Row '+(state.row+1)+' of '+s.rows.length+' · Seat '+(state.seat+1);
   ui.sub.innerHTML=sub+(c.restricted?'<span class="restricted">Restricted view</span>':'');
   ui.verdict.textContent=verdictFor(f);
   setStat('s-stage',Math.round(f.dStage)+' m<small>to the stage edge</small>');
-  setStat('s-bstage',Math.round(f.dB)+' m<small>to the centre stage</small>');
+  setStat('s-run',Math.round(f.dRun)+' m<small>to the nearest runway</small>');
   setStat('s-height',f.height.toFixed(1)+' m<small>eye level above the floor</small>');
   setStat('s-angle',Math.round(Math.min(f.off,180))+'°<small>from the screen’s centre line</small>');
   setStat('s-main',pct(f.mainVis)+'<div class="meter"><span style="width:'+pct(f.mainVis)+'"></span></div><small>sightline check</small>');
@@ -1065,7 +1093,7 @@ function pickSection(cx,cy){
   const floorPick=ray.ray.intersectPlane(new THREE.Plane(UP,0),new THREE.Vector3());
   const hit=ray.intersectObjects(sectionMeshes,false)[0];
   if(floorPick&&(!hit||floorPick.distanceTo(camera.position)<hit.distance)){
-    const f=SECTIONS.find(s=>s.kind==='floor'&&floorPick.x>=s.x0&&floorPick.x<=s.x1&&floorPick.z>=s.z0&&floorPick.z<=s.z1);
+    const f=SECTIONS.find(s=>s.kind==='floor'&&inPoly(floorPick.x,floorPick.z,s.poly));
     if(f) return {s:f,p:floorPick};
   }
   return hit?{s:hit.object.userData.sec,p:hit.point}:null;
@@ -1153,7 +1181,7 @@ function frame(now){
   screenUniforms.forEach(u=>{u.uTime.value=t;u.uShow.value=showI;});
   stickU.uTime.value=reduceMotion?0:t; stickU.uShow.value=showI;
   stickU.uPix.value=renderer.domElement.height/(2*Math.tan(camera.fov*D2R/2));
-  bRing.material.color.setRGB(1,0.82,0.12).multiplyScalar(0.35+0.65*showI*(0.6+0.4*Math.sin(t*2)));
+  apexMat.color.setRGB(1,0.82,0.12).multiplyScalar(0.35+0.65*showI*(0.6+0.4*Math.sin(t*2)));
   ribbonTex.offset.x=(ribbonTex.offset.x+dt*0.012)%1;
 
   const sweep=reduceMotion?0.25:1;
