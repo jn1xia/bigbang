@@ -677,9 +677,9 @@ SIDE_SCREENS.forEach((s,i)=>{
 const beamGroup=new THREE.Group(); scene.add(beamGroup);
 const beams=[];
 function beamMaterial(color){
-  return new THREE.ShaderMaterial({uniforms:{uColor:{value:new THREE.Color(color)},uI:{value:1},uLen:{value:1}},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
+  return new THREE.ShaderMaterial({uniforms:{uColor:{value:new THREE.Color(color)},uI:{value:1},uLen:{value:1},uPow:{value:1.5}},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
     vertexShader:'uniform float uLen;varying float vF;varying vec3 vN;varying vec3 vV;void main(){vF=1.0-position.z/uLen;vec4 mv=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}',
-    fragmentShader:'uniform vec3 uColor;uniform float uI;varying float vF;varying vec3 vN;varying vec3 vV;void main(){float f=pow(abs(dot(normalize(vN),normalize(vV))),2.2);float a=pow(max(vF,0.0),1.5)*f*uI*0.55;gl_FragColor=vec4(uColor*a,1.0);}'});
+    fragmentShader:'uniform vec3 uColor;uniform float uI,uPow;varying float vF;varying vec3 vN;varying vec3 vV;void main(){float f=pow(abs(dot(normalize(vN),normalize(vV))),2.2);float a=pow(max(vF,0.0),uPow)*f*uI*0.55;gl_FragColor=vec4(uColor*a,1.0);}'});
 }
 function addBeam(x,y,z,len,radius,color,up,phase){
   const g=new THREE.ConeGeometry(radius,len,20,1,true); g.translate(0,-len/2,0); g.rotateX(-Math.PI/2);
@@ -697,7 +697,7 @@ for(let i=0;i<8;i++){
 }
 
 /* ------------------------------------------------------------------ */
-/* Crowd: a lightstick for every ticket, bodies near the chosen seat  */
+/* Crowd: a lightstick for every ticket, animated fans near the seat  */
 /* ------------------------------------------------------------------ */
 const crowd=[]; // x, floorY, z, alwaysStanding
 SECTIONS.forEach(s=>{
@@ -709,26 +709,61 @@ SECTIONS.forEach(s=>{
   s.rows.forEach(arr=>{for(let i=0;i<arr.length;i+=3) crowd.push(arr[i],arr[i+1],arr[i+2],0);});
 });
 const CROWD=new Float32Array(crowd),CROWD_N=CROWD.length/4;
+const CROWD_PH=new Float32Array(CROWD_N),CROWD_H=new Float32Array(CROWD_N);
+for(let i=0;i<CROWD_N;i++){CROWD_PH[i]=rand();CROWD_H[i]=0.94+0.1*rand();}
 
-const stickU={uTime:{value:0},uPix:{value:800},uShow:{value:1},uLift:{value:0},uSelf:{value:new THREE.Vector3(0,-999,0)},uColor:{value:new THREE.Color(0xffd21f)}};
+/* One pose function drives every body and every lightstick glow, so the figures near you and
+   the far lightstick ocean move together: a 120 bpm bounce, a sway that travels round the bowl,
+   some fans pumping their free fist, and arms lowered while the house lights are up.
+   a = (phase, angle round the bowl, mode, walking); mode 0 seated fan, 1 standing fan, 2 performer.
+   Figure space: feet at the origin, facing +z, shoulders at y 1.42. */
+const animU={uTime:{value:0},uEnergy:{value:1}};
+const POSE_GLSL=[
+  'uniform float uTime;uniform float uEnergy;',
+  'vec3 rotX(vec3 v,float a){float c=cos(a),s=sin(a);return vec3(v.x,v.y*c-v.z*s,v.y*s+v.z*c);}',
+  'vec3 rotZ(vec3 v,float a){float c=cos(a),s=sin(a);return vec3(v.x*c-v.y*s,v.x*s+v.y*c,v.z);}',
+  'void crowdPose(vec4 a,out vec4 arms,out vec4 body){',
+  ' float pb=3.14159*(uTime*2.0+a.x*0.3);float pump=abs(sin(pb));',
+  ' if(a.z>1.5){',
+  '  float g=sin(uTime*7.0+a.x*6.2832),d1=sin(pb*0.5+a.x*6.2832),w=a.w;',
+  '  arms=vec4(mix(1.2+0.9*d1,2.75+0.3*g,w),mix(0.5*sin(pb+a.x*4.0),0.0,w),mix(-1.0-0.9*sin(pb*0.5+a.x*6.2832+1.6),0.4*g,w),0.0);',
+  '  body=vec4(mix(0.14*pump,0.03*g,w),mix(0.1*sin(pb),0.0,w),mix(0.1*pump,0.03*abs(g),w),mix(0.12*sin(pb),0.55*g,w));',
+  '  return;}',
+  ' float e=uEnergy,st=a.z,sway=sin(pb+a.y*2.0+a.x*0.8);',
+  // seated fans wave at head height in front of them; standing fans raise their arms high
+  ' arms=vec4(mix(2.35,mix(1.05-0.12*pump,0.22-0.18*pump,st),e),0.55*sway*e*mix(0.6,1.0,st),-e*(0.25+step(0.62,a.x)*(1.25+0.7*pump)*mix(0.55,1.0,st)),mix(-1.3,0.0,st));',
+  ' body=vec4(0.16*pump*e,0.05*sway*e*(0.4+0.6*st),mix(-0.4,0.07*pow(pump,1.5)*e,st),0.0);}',
+  'void poseVertex(inout vec3 p,inout vec3 n,float part,vec4 arms,vec4 body){vec3 o;',
+  ' if((part>1.5&&part<2.5)||(part>3.5&&part<4.5)){o=vec3(0.215,1.42,0.0);p=rotZ(rotX(p-o,arms.x),arms.y)+o;n=rotZ(rotX(n,arms.x),arms.y);}',
+  ' else if(part>2.5&&part<3.5){o=vec3(-0.215,1.42,0.0);p=rotX(p-o,arms.z)+o;n=rotX(n,arms.z);}',
+  ' else if(part>0.5&&part<1.5){o=vec3(0.0,1.5,0.0);p=rotX(p-o,body.x)+o;n=rotX(n,body.x);}',
+  ' else if(part>4.5&&part<5.5){o=vec3(0.085,0.82,0.0);p=rotX(p-o,arms.w+body.w)+o;n=rotX(n,arms.w+body.w);}',
+  ' else if(part>5.5){o=vec3(-0.085,0.82,0.0);p=rotX(p-o,arms.w-body.w)+o;n=rotX(n,arms.w-body.w);}',
+  ' p=rotZ(p,body.y);n=rotZ(n,body.y);p.y+=body.z;}'
+].join('\n');
+
+const stickU={uTime:animU.uTime,uEnergy:animU.uEnergy,uPix:{value:800},uShow:{value:1},uStand:{value:0},uSelf:{value:new THREE.Vector3(0,-999,0)},uColor:{value:new THREE.Color(0xffd21f)}};
 (function sticks(){
-  const pos=new Float32Array(CROWD_N*3),ph=new Float32Array(CROWD_N),ang=new Float32Array(CROWD_N),lift=new Float32Array(CROWD_N);
+  const pos=new Float32Array(CROWD_N*3),ang=new Float32Array(CROWD_N),st=new Float32Array(CROWD_N);
   for(let i=0;i<CROWD_N;i++){
-    const st=CROWD[i*4+3]>0.5;
-    pos[i*3]=CROWD[i*4]+(rand()-0.5)*0.2; pos[i*3+1]=CROWD[i*4+1]+(st?1.85:1.4); pos[i*3+2]=CROWD[i*4+2];
-    ph[i]=rand(); ang[i]=Math.atan2(CROWD[i*4],CROWD[i*4+2]); lift[i]=st?0:1;
+    pos[i*3]=CROWD[i*4]; pos[i*3+1]=CROWD[i*4+1]; pos[i*3+2]=CROWD[i*4+2];
+    ang[i]=Math.atan2(CROWD[i*4],CROWD[i*4+2]); st[i]=CROWD[i*4+3];
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  g.setAttribute('aPhase',new THREE.BufferAttribute(ph,1));
+  g.setAttribute('aPhase',new THREE.BufferAttribute(CROWD_PH,1));
   g.setAttribute('aAng',new THREE.BufferAttribute(ang,1));
-  g.setAttribute('aLift',new THREE.BufferAttribute(lift,1));
+  g.setAttribute('aStandA',new THREE.BufferAttribute(st,1));
+  g.setAttribute('aH',new THREE.BufferAttribute(CROWD_H,1));
   const m=new THREE.ShaderMaterial({uniforms:stickU,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
-    vertexShader:[
-      'uniform float uTime,uPix,uShow,uLift;uniform vec3 uSelf;attribute float aPhase,aAng,aLift;varying float vB;',
-      'void main(){vec3 p=position;p.y+=uLift*aLift;',
-      ' if(distance(p.xz,uSelf.xz)<0.3&&abs(p.y-uSelf.y)<3.0){gl_Position=vec4(2.0,2.0,2.0,1.0);gl_PointSize=0.0;vB=0.0;return;}',
-      ' vec4 mv=modelViewMatrix*vec4(p,1.0);',
+    vertexShader:[POSE_GLSL,
+      'uniform float uPix,uShow,uStand;uniform vec3 uSelf;attribute float aPhase,aAng,aStandA,aH;varying float vB;',
+      'void main(){',
+      ' if(distance(position.xz,uSelf.xz)<0.3&&abs(position.y-uSelf.y)<0.5){gl_Position=vec4(2.0,2.0,2.0,1.0);gl_PointSize=0.0;vB=0.0;return;}',
+      ' float st=max(aStandA,uStand);vec4 arms,body;crowdPose(vec4(aPhase,aAng,st,0.0),arms,body);',
+      ' vec3 tip=vec3(0.215,2.28,0.0),nn=vec3(0.0,1.0,0.0);poseVertex(tip,nn,2.0,arms,body);tip.y*=aH;',
+      ' float yaw=atan(-position.x,-40.0-position.z),c=cos(yaw),s=sin(yaw);',
+      ' vec4 mv=modelViewMatrix*vec4(position+vec3(tip.x*c+tip.z*s,tip.y,-tip.x*s+tip.z*c),1.0);',
       ' float wave=0.5+0.5*sin(aAng*2.0-uTime*1.4);float tw=0.78+0.22*sin(uTime*5.0+aPhase*6.283);',
       ' vB=mix(0.32,mix(0.45,1.0,wave)*tw,uShow);',
       ' gl_PointSize=clamp(0.36*uPix/max(-mv.z,0.1),1.6,18.0);gl_Position=projectionMatrix*mv;}'
@@ -737,21 +772,127 @@ const stickU={uTime:{value:0},uPix:{value:800},uShow:{value:1},uLift:{value:0},u
   const pts=new THREE.Points(g,m); pts.frustumCulled=false; pts.renderOrder=3; scene.add(pts);
 })();
 
-function mergeBoxes(defs){
-  const pos=[],nor=[],idx=[];let off=0;
-  defs.forEach(b=>{const g=new THREE.BoxGeometry(b[0],b[1],b[2]);g.translate(b[3],b[4],b[5]);
-    const p=g.attributes.position.array,n=g.attributes.normal.array,ix=g.index.array;
-    for(let i=0;i<p.length;i++){pos.push(p[i]);nor.push(n[i]);}
-    for(let i=0;i<ix.length;i++) idx.push(ix[i]+off); off+=p.length/3; g.dispose();});
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setIndex(idx);return g;
+/* Figures. Parts: 0 torso/hips, 1 head, 2 lightstick arm, 3 free arm, 4 crown, 5/6 legs.
+   Tints: 0 fixed colour, 1 clothing (per figure), 2 skin (per figure), 3 glowing crown, 4 hair. */
+function buildPerson(detail,stick){
+  const P=[],N=[],C=[],PART=[],TINT=[],IDX=[];let off=0;
+  const DENIM=[0.13,0.14,0.17],WHITE=[1,1,1],SKIN=[0.86,0.66,0.52],BLACK=[0.05,0.05,0.06],GLOW=[1,0.84,0.18];
+  function add(g,part,tint,col){
+    const p=g.attributes.position.array,n=g.attributes.normal.array;
+    for(let i=0;i<p.length;i+=3){P.push(p[i],p[i+1],p[i+2]);N.push(n[i],n[i+1],n[i+2]);C.push(col[0],col[1],col[2]);PART.push(part);TINT.push(tint);}
+    if(g.index){const ix=g.index.array;for(let i=0;i<ix.length;i++) IDX.push(ix[i]+off);} else for(let i=0;i<p.length/3;i++) IDX.push(i+off);
+    off+=p.length/3; g.dispose();
+  }
+  const B=(w,h,d,x,y,z)=>new THREE.BoxGeometry(w,h,d).translate(x,y,z);
+  const Cy=(rt,rb,h,seg,x,y,z)=>new THREE.CylinderGeometry(rt,rb,h,seg).translate(x,y,z);
+  const SH=1.42,SX=0.215;
+  [1,-1].forEach(k=>{const part=k>0?5:6;add(B(0.13,0.8,0.15,k*0.085,0.42,0),part,0,DENIM);add(B(0.13,0.07,0.25,k*0.085,0.035,0.04),part,0,BLACK);});
+  if(detail){
+    add(B(0.31,0.16,0.19,0,0.86,0),0,0,DENIM);
+    add(new THREE.CylinderGeometry(0.19,0.155,0.56,7).scale(1,1,0.62).translate(0,1.2,0),0,1,WHITE);
+    add(Cy(0.045,0.05,0.1,6,0,1.5,0),0,2,SKIN);
+    add(new THREE.SphereGeometry(0.105,9,7).scale(0.95,1.1,1).translate(0,1.64,0),1,2,SKIN);
+    add(new THREE.SphereGeometry(0.113,9,4,0,Math.PI*2,0,Math.PI*0.56).scale(0.97,1.1,1.05).translate(0,1.656,-0.012),1,4,WHITE);
+    [[1,2],[-1,3]].forEach(([k,part])=>{
+      add(Cy(0.048,0.044,0.3,6,k*SX,SH+k*0.15,0),part,1,WHITE);
+      add(Cy(0.042,0.036,0.3,6,k*SX,SH+k*0.45,0),part,2,SKIN);
+      add(B(0.07,0.085,0.06,k*SX,SH+k*0.64,0),part,2,SKIN);
+    });
+  }else{
+    add(B(0.38,0.7,0.22,0,1.13,0),0,1,WHITE);
+    add(B(0.19,0.23,0.21,0,1.63,0),1,2,SKIN);
+    add(B(0.2,0.07,0.22,0,1.75,-0.01),1,4,WHITE);
+    add(B(0.085,0.66,0.085,SX,SH+0.33,0),2,1,WHITE);
+    add(B(0.085,0.66,0.085,-SX,SH-0.33,0),3,1,WHITE);
+  }
+  if(stick){
+    add(Cy(0.017,0.017,0.16,5,SX,SH+0.72,0),2,0,BLACK);
+    if(detail){
+      add(Cy(0.062,0.045,0.06,8,SX,SH+0.82,0),4,3,GLOW);
+      for(let j=0;j<5;j++){const a=j/5*Math.PI*2;add(new THREE.ConeGeometry(0.018,0.055,4).translate(SX+0.05*Math.cos(a),SH+0.877,0.05*Math.sin(a)),4,3,GLOW);}
+    }else add(B(0.11,0.09,0.11,SX,SH+0.83,0),4,3,GLOW);
+  }else if(detail){
+    add(Cy(0.016,0.012,0.17,6,SX,SH+0.72,0),2,0,BLACK);
+    add(new THREE.SphereGeometry(0.03,8,6).translate(SX,SH+0.82,0),2,0,[0.25,0.25,0.27]);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));
+  g.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(C,3));
+  g.setAttribute('aPart',new THREE.Float32BufferAttribute(PART,1));
+  g.setAttribute('aTint',new THREE.Float32BufferAttribute(TINT,1));
+  g.setIndex(IDX); return g;
 }
-// legs, torso, head, one arm raised with a lightstick
-const personGeo=mergeBoxes([[0.3,0.8,0.2,0,0.4,0],[0.4,0.6,0.24,0,1.1,0],[0.2,0.23,0.22,0,1.55,0],[0.08,0.52,0.08,0.22,1.6,0.02]]);
-const MAXP=14000;
-const people=new THREE.InstancedMesh(personGeo,new THREE.MeshLambertMaterial({color:0xffffff}),MAXP);
-const clothes=[0x1b1d22,0x24211e,0x2b2f37,0x141518,0x37322c,0x202630,0x8d8f94,0x2a1f22].map(c=>new THREE.Color(c));
-for(let i=0;i<MAXP;i++) people.setColorAt(i,clothes[i%clothes.length]);
-people.count=0; people.frustumCulled=false; scene.add(people);
+function injectPose(shader){
+  shader.uniforms.uTime=animU.uTime; shader.uniforms.uEnergy=animU.uEnergy;
+  shader.vertexShader=shader.vertexShader
+    .replace('#include <common>','#include <common>\n'+POSE_GLSL+'\nattribute vec4 aAnim;\nattribute float aPart;\nattribute float aTint;\nvarying float vTint;')
+    .replace('#include <color_vertex>',['vColor=color;','#ifdef USE_INSTANCING_COLOR','if(aTint>0.5&&aTint<1.5) vColor*=instanceColor;','#endif',
+      'if(aTint>1.5&&aTint<2.5) vColor*=0.62+0.42*fract(aAnim.x*13.7);',
+      'if(aTint>3.5) vColor=mix(vec3(0.05,0.04,0.035),vec3(0.62,0.5,0.32),step(0.86,fract(aAnim.x*31.0)));'].join('\n'))
+    .replace('#include <beginnormal_vertex>','vec4 pArms,pBody;crowdPose(aAnim,pArms,pBody);vec3 objectNormal=vec3(normal);vec3 posed=position;poseVertex(posed,objectNormal,aPart,pArms,pBody);vTint=aTint;')
+    .replace('#include <begin_vertex>','vec3 transformed=posed;');
+  shader.fragmentShader=shader.fragmentShader
+    .replace('#include <common>','#include <common>\nvarying float vTint;\nuniform float uEnergy;')
+    .replace('#include <dithering_fragment>','#include <dithering_fragment>\nif(vTint>2.5&&vTint<3.5) gl_FragColor=vec4(vec3(1.0,0.84,0.18)*(0.55+0.75*uEnergy),1.0);');
+}
+const CLOTHES=[0x16171a,0x1d1f24,0xe9e9e6,0x14151a,0x2b2f38,0xd9b21c,0x30466e,0x1a1b1f,0x6e2230,0x4a4e57,0x101114,0xbfc3c9].map(c=>new THREE.Color(c));
+const crowdMat=new THREE.MeshLambertMaterial({vertexColors:true}); crowdMat.onBeforeCompile=injectPose;
+function makeFigures(geo,mat,max){
+  const anim=new THREE.InstancedBufferAttribute(new Float32Array(max*4),4); anim.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('aAnim',anim);
+  const m=new THREE.InstancedMesh(geo,mat,max);
+  for(let i=0;i<max;i++) m.setColorAt(i,CLOTHES[i%CLOTHES.length]);
+  m.count=0; m.frustumCulled=false; scene.add(m); return m;
+}
+// detailed figures close to the seat, simpler ones further out
+const MAX_NEAR=2500,MAX_FAR=14000;
+const peopleNear=makeFigures(buildPerson(true,true),crowdMat,MAX_NEAR);
+const peopleFar=makeFigures(buildPerson(false,true),crowdMat,MAX_FAR);
+
+/* Three stand-in performers (generic figures, not likenesses) who work the runways on a
+   50-second loop under follow spots from the far roof edge. */
+const perfMat=new THREE.MeshLambertMaterial({vertexColors:true,emissive:0x2a2a2a}); perfMat.onBeforeCompile=injectPose;
+const performers=makeFigures(buildPerson(true,false),perfMat,3);
+[0xf4f4f2,0x1b1b1e,0xc9a44c].forEach((c,i)=>performers.setColorAt(i,new THREE.Color(c)));
+performers.count=3;
+const followSpots=[-18,0,18].map(x=>{
+  const g=new THREE.ConeGeometry(0.016,1,18,1,true); g.translate(0,-0.5,0); g.rotateX(-Math.PI/2);
+  const mat=beamMaterial(0xfff7e8); mat.uniforms.uPow.value=0.35;
+  const m=new THREE.Mesh(g,mat); m.position.set(x,54,58.5); m.renderOrder=2; beamGroup.add(m);
+  const pool=new THREE.Mesh(new THREE.CircleGeometry(1.5,28).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xfff4dc,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(pool); return {m,pool};
+});
+const PERF_HOME=[[-7,-46],[0,-48],[7,-46]],PERF_SPOT=[[-2.6,-9],[0,-11.6],[2.6,-9]],PERF_LOOP=50;
+const smoothstep01=(u)=>u*u*(3-2*u);
+function perfPos(i,t){
+  const tt=((t%PERF_LOOP)+PERF_LOOP)%PERF_LOOP,out=RUNWAYS[i],back=RUNWAYS[(i+1)%3];
+  const H=PERF_HOME[i],S=PERF_SPOT[i],A=[out.x0,out.z0],Bk=[back.x0,back.z0];
+  const seg=(a,b,t0,t1)=>{const u=smoothstep01(clamp((tt-t0)/(t1-t0),0,1));return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];};
+  if(tt<10) return {p:H,where:'home'};
+  if(tt<13) return {p:seg(H,A,10,13),where:'walk'};
+  if(tt<24) return {p:seg(A,S,13,24),where:'walk'};
+  if(tt<34) return {p:S,where:'spot'};
+  if(tt<45) return {p:seg(S,Bk,34,45),where:'walk'};
+  if(tt<48) return {p:seg(Bk,H,45,48),where:'walk'};
+  return {p:H,where:'home'};
+}
+const perfYaw=[0,0,0],perfM=new THREE.Matrix4(),perfQ=new THREE.Quaternion(),perfE=new THREE.Euler(),perfS=new THREE.Vector3(1.02,1.02,1.02),perfP=new THREE.Vector3(),perfT=new THREE.Vector3();
+function updatePerformers(t,dt){
+  const anim=performers.geometry.attributes.aAnim;
+  for(let i=0;i<3;i++){
+    const a=perfPos(i,t),b=perfPos(i,t+0.15),dx=b.p[0]-a.p[0],dz=b.p[1]-a.p[1];
+    const target=a.where==='walk'&&Math.hypot(dx,dz)>0.01?Math.atan2(dx,dz):a.where==='spot'?[-0.7,0,0.7][i]+0.5*Math.sin(t*0.3+i*2):0.35*Math.sin(t*0.4+i*2);
+    let d=target-perfYaw[i]; d=Math.atan2(Math.sin(d),Math.cos(d)); perfYaw[i]+=d*Math.min(1,dt*5);
+    const y=a.p[1]<-38.3?2.2:1.5;
+    perfE.set(0,perfYaw[i],0); perfQ.setFromEuler(perfE); perfP.set(a.p[0],y,a.p[1]);
+    perfM.compose(perfP,perfQ,perfS); performers.setMatrixAt(i,perfM);
+    anim.setXYZW(i,i*0.37,0,2,a.where==='walk'?1:0);
+    const fs=followSpots[i]; perfT.set(a.p[0],y+1,a.p[1]); fs.m.lookAt(perfT); fs.m.scale.setScalar(fs.m.position.distanceTo(perfT));
+    fs.pool.position.set(a.p[0],y+0.03,a.p[1]);
+  }
+  performers.instanceMatrix.needsUpdate=true; anim.needsUpdate=true;
+}
 
 /* You-are-here marker for the stadium view */
 const marker=new THREE.Group();
@@ -886,26 +1027,28 @@ function verdictFor(f){
 /* ------------------------------------------------------------------ */
 const pm=new THREE.Matrix4(),pq=new THREE.Quaternion(),ps=new THREE.Vector3(),pp=new THREE.Vector3(),pe=new THREE.Euler();
 function rebuildPeople(){
-  const R=narrow()?30:42,R2=R*R; let k=0;
+  const RN=narrow()?9:13,RF=narrow()?28:40,RN2=RN*RN,RF2=RF*RF;
   const cand=[];
   for(let i=0;i<CROWD_N;i++){
     const x=CROWD[i*4],y=CROWD[i*4+1],z=CROWD[i*4+2];
-    const dx=x-seatPos.x,dz=z-seatPos.z; if(dx>R||dx<-R||dz>R||dz<-R) continue;
-    const dy=y-seatPos.y,dd=dx*dx+dz*dz+dy*dy; if(dd>R2||dd<0.06) continue;
+    const dx=x-seatPos.x,dz=z-seatPos.z; if(dx>RF||dx<-RF||dz>RF||dz<-RF) continue;
+    const dy=y-seatPos.y,dd=dx*dx+dz*dz+dy*dy; if(dd>RF2||dd<0.06) continue;
     cand.push(dd,i);
   }
   const order=[]; for(let j=0;j<cand.length;j+=2) order.push(j);
-  if(order.length/1>MAXP) order.sort((a,b)=>cand[a]-cand[b]);
+  order.sort((a,b)=>cand[a]-cand[b]);
+  const an=peopleNear.geometry.attributes.aAnim,af=peopleFar.geometry.attributes.aAnim;
+  let kn=0,kf=0;
   for(const j of order){
-    if(k>=MAXP) break;
-    const i=cand[j+1],x=CROWD[i*4],y=CROWD[i*4+1],z=CROWD[i*4+2];
-    const st=CROWD[i*4+3]>0.5||state.posture==='stand';
-    pe.set(0,Math.atan2(-x,-40-z),0); pq.setFromEuler(pe);
-    const h=0.93+0.12*((i*2654435761>>>0)%1000)/1000;
-    ps.set(1,(st?1:0.72)*h,1); pp.set(x,y,z);
-    pm.compose(pp,pq,ps); people.setMatrixAt(k,pm); people.setColorAt(k,clothes[(i*7)%clothes.length]); k++;
+    const dd=cand[j],i=cand[j+1],near=dd<RN2&&kn<MAX_NEAR;
+    if(!near&&kf>=MAX_FAR) break;
+    const mesh=near?peopleNear:peopleFar,attr=near?an:af,k=near?kn++:kf++;
+    const x=CROWD[i*4],y=CROWD[i*4+1],z=CROWD[i*4+2],st=CROWD[i*4+3]>0.5||state.posture==='stand';
+    pe.set(0,Math.atan2(-x,-40-z),0); pq.setFromEuler(pe); ps.set(1,CROWD_H[i],1); pp.set(x,y,z);
+    pm.compose(pp,pq,ps); mesh.setMatrixAt(k,pm); mesh.setColorAt(k,CLOTHES[(i*7)%CLOTHES.length]);
+    attr.setXYZW(k,CROWD_PH[i],Math.atan2(x,z),st?1:0,0);
   }
-  people.count=k; people.instanceMatrix.needsUpdate=true; if(people.instanceColor) people.instanceColor.needsUpdate=true;
+  [[peopleNear,kn,an],[peopleFar,kf,af]].forEach(([m,c,a])=>{m.count=c;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;a.needsUpdate=true;});
 }
 
 /* ------------------------------------------------------------------ */
@@ -1036,7 +1179,7 @@ function selectSeat(s,row,seat,opts){
   const areaChanged=!prevSec||(prevSec.kind!==s.kind)||(isStandingArea(prevSec)!==isStandingArea(s));
   state.sec=s;state.row=row;state.seat=seat;
   if(areaChanged&&!opts.restore) state.posture=s.kind==='floor'?'stand':'sit';
-  stickU.uLift.value=state.posture==='stand'?0.45:0;
+  stickU.uStand.value=state.posture==='stand'?1:0;
   setSeatPos();
   stickU.uSelf.value.copy(seatPos);
   marker.position.copy(seatPos);
@@ -1070,7 +1213,7 @@ $('#btn-show').addEventListener('click',()=>{state.lights='show';syncButtons();s
 $('#btn-house').addEventListener('click',()=>{state.lights='house';syncButtons();save();});
 $('#btn-open').addEventListener('click',()=>{state.roof='open';syncButtons();save();});
 $('#btn-closed').addEventListener('click',()=>{state.roof='closed';syncButtons();save();});
-function setPosture(p){if(isStandingArea(state.sec))return;state.posture=p;stickU.uLift.value=p==='stand'?0.45:0;setSeatPos();rebuildPeople();updatePanel();syncButtons();save();}
+function setPosture(p){if(isStandingArea(state.sec))return;state.posture=p;stickU.uStand.value=p==='stand'?1:0;setSeatPos();rebuildPeople();updatePanel();syncButtons();save();}
 $('#btn-sit').addEventListener('click',()=>setPosture('sit'));
 $('#btn-stand').addEventListener('click',()=>setPosture('stand'));
 ui.sec.addEventListener('change',()=>selectSeat(SEC_BY_ID[ui.sec.value],null,null,{go:false}));
@@ -1179,7 +1322,10 @@ function frame(now){
   scene.fog.density=0.0012+0.0011*showI;
 
   screenUniforms.forEach(u=>{u.uTime.value=t;u.uShow.value=showI;});
-  stickU.uTime.value=reduceMotion?0:t; stickU.uShow.value=showI;
+  const at=reduceMotion?0:t;
+  animU.uTime.value=at; animU.uEnergy.value=showI; stickU.uShow.value=showI;
+  performers.visible=showI>0.5; followSpots.forEach(f=>{f.pool.visible=performers.visible;});
+  if(performers.visible) updatePerformers(at,dt);
   stickU.uPix.value=renderer.domElement.height/(2*Math.tan(camera.fov*D2R/2));
   apexMat.color.setRGB(1,0.82,0.12).multiplyScalar(0.35+0.65*showI*(0.6+0.4*Math.sin(t*2)));
   ribbonTex.offset.x=(ribbonTex.offset.x+dt*0.012)%1;
