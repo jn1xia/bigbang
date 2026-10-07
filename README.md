@@ -64,6 +64,31 @@ sizes are **estimates**, so confirm your seat against the official map.
 
 Not affiliated with YG Entertainment, PK Entertainment or Jakarta International Stadium.
 
+## Visitor counter
+
+The published site shows "N visitors so far" under the title. It counts each browser once: the
+first visit adds one and leaves a flag in the browser, and later visits only read the total. It
+uses [Abacus](https://github.com/JasonLovesDoggo/abacus), a free counter service that needs no
+account. It runs only on `jn1xia.github.io` and the Fly.io address, so local copies and previews
+never change the count. If the service is slow or down, the line simply stays hidden.
+
+- **See the total any time:** https://abacus.jasoncameron.dev/get/jn1xia.github.io/bigbang-visitors
+- **Protect the count (optional, do it once):** anyone who knows the address could add fake hits,
+  so it helps to own the counter. Before the counter goes live, open
+  https://abacus.jasoncameron.dev/create/jn1xia.github.io/bigbang-visitors in a browser and save
+  the `admin_key` it shows somewhere private (never in this repo). With that key you can later
+  correct the number with Abacus's `/set` call. This only works before the first visit creates
+  the counter.
+- **Limits:** this counts browsers, not people. Someone visiting on a phone and a laptop counts
+  twice, and clearing browser data or using private browsing counts again. Visitors who block
+  the request (some ad blockers) are not counted.
+
+### Full stats dashboard (optional)
+
+For visitors per day, countries, devices and where people came from, sign up free at
+[GoatCounter](https://www.goatcounter.com) (no cookies, no consent banner needed). Pick a site
+code, then put it in `GOATCOUNTER_CODE` near the end of `index.html`.
+
 ## Deploy
 
 The site is the single `index.html` file, so any static host works.
