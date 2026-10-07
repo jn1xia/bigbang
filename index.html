@@ -45,6 +45,9 @@ button,select,input{font:inherit;color:inherit}
 .venue{margin:10px 0 0;font:500 11.5px/1.45 var(--f-data);letter-spacing:.04em;color:#c9cdd6}
 .venue b{font-weight:500;color:var(--ink)}
 .tag{display:inline-block;margin-left:6px;padding:1px 5px;background:var(--ink);color:var(--void);font-size:9.5px;letter-spacing:.1em;vertical-align:1px}
+.visitors{display:flex;align-items:center;gap:7px;margin:8px 0 0;font:500 11.5px/1.3 var(--f-data);letter-spacing:.04em;color:#c9cdd6;font-variant-numeric:tabular-nums}
+.visitors b{font-weight:500;color:var(--ink)}
+.visitors i{width:6px;height:6px;border-radius:50%;background:var(--crown);box-shadow:0 0 8px var(--crown)}
 
 /* Control dock */
 .dock{position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px;max-width:calc(100vw - 32px - 392px)}
@@ -116,7 +119,8 @@ input[type=range]{width:100%;min-width:0;accent-color:var(--crown)}
   .brand h1{font-size:24px}
   .brand .eyebrow,.brand .tag{display:none}
   .venue{margin-top:6px;font-size:10.5px}
-  .dock{left:0;right:0;bottom:auto;top:calc(env(safe-area-inset-top,0px) + 102px);max-width:none;flex-wrap:nowrap;overflow-x:auto;padding:2px 16px 6px;scrollbar-width:none}
+  .visitors{margin-top:5px;font-size:10.5px}
+  .dock{left:0;right:0;bottom:auto;top:calc(env(safe-area-inset-top,0px) + 120px);max-width:none;flex-wrap:nowrap;overflow-x:auto;padding:2px 16px 6px;scrollbar-width:none}
   .dock::-webkit-scrollbar{display:none}
   .seg-btns button{padding:7px 9px;font-size:11.5px}
   .hint{display:none}
@@ -139,6 +143,7 @@ input[type=range]{width:100%;min-width:0;accent-color:var(--crown)}
   <p class="eyebrow">Unofficial seat-view simulator</p>
   <h1>BIGBANG<span>XX : COSMOS</span></h1>
   <p class="venue"><b>Jakarta International Stadium</b><br>Sat 16 Jan 2027 · Sun 17 Jan 2027<span class="tag">SHOW ADDED</span> · 19:00 WIB</p>
+  <p class="visitors" id="visitors" hidden><i></i><span><b id="visitorCount"></b> visitors so far</span></p>
 </header>
 
 <div class="dock" role="toolbar" aria-label="View controls">
@@ -1376,6 +1381,51 @@ selectSeat(s0,r0,saved&&saved.sec===s0.id?clamp(saved.seat|0,0,n0-1):3,{instant:
 flyTo(povPose(),0);
 syncButtons();
 requestAnimationFrame(frame);
+})();
+</script>
+<script>
+/* Visitor counter. Shows a public "N visitors so far" line, counting each browser once: the first
+   visit increments the total and leaves a flag in localStorage, and later visits only read it.
+   It runs only on the published site, so local copies and previews never touch the count, and the
+   line stays hidden if the counter service is slow, rate-limited or unreachable.
+   Service: Abacus (abacus.jasoncameron.dev), a free counter API that needs no account.
+   The owner can read the total any time at COUNTER_BASE + '/get/' + COUNTER_KEY. */
+(function(){
+  'use strict';
+  var COUNTER_BASE='https://abacus.jasoncameron.dev';
+  var COUNTER_KEY='jn1xia.github.io/bigbang-visitors';
+  var LIVE_HOSTS=['jn1xia.github.io','bigbang-jis-seat-view.fly.dev'];
+  // Optional dashboard: sign up free at goatcounter.com, then put your site code here (e.g. 'bigbang-jis').
+  var GOATCOUNTER_CODE='';
+
+  if(LIVE_HOSTS.indexOf(location.hostname)<0) return;
+
+  if(GOATCOUNTER_CODE){
+    var gc=document.createElement('script');
+    gc.async=true; gc.src='https://gc.zgo.at/count.js';
+    gc.setAttribute('data-goatcounter','https://'+GOATCOUNTER_CODE+'.goatcounter.com/count');
+    document.head.appendChild(gc);
+  }
+
+  // If the browser blocks storage, only read the total, so reloads never count again
+  var FLAG='bbjis.counted.v1',counted=true;
+  try{counted=localStorage.getItem(FLAG)==='1';}catch(e){}
+  function call(path){
+    var ctl=window.AbortController?new AbortController():null;
+    var timer=ctl?setTimeout(function(){ctl.abort();},6000):0;
+    return fetch(COUNTER_BASE+path+COUNTER_KEY,{cache:'no-store',signal:ctl?ctl.signal:undefined})
+      .then(function(r){clearTimeout(timer);if(!r.ok) throw r.status;return r.json();});
+  }
+  function show(d){
+    var n=Number(d&&d.value);
+    if(!isFinite(n)||n<1) return;
+    document.getElementById('visitorCount').textContent=n.toLocaleString('id-ID');
+    document.getElementById('visitors').hidden=false;
+  }
+  (counted
+    ? call('/get/').catch(function(err){if(err===404) return call('/hit/');throw err;})
+    : call('/hit/').then(function(d){try{localStorage.setItem(FLAG,'1');}catch(e){}return d;})
+  ).then(show).catch(function(){});
 })();
 </script>
 </body>
