@@ -1,0 +1,35 @@
+name: Deploy to Fly.io
+
+# Needs a FLY_API_TOKEN repository secret (an org token from `fly tokens create org`).
+# Without it the job only prints a notice, so pushes never fail on a missing token.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [index.html, Dockerfile, fly.toml, .github/workflows/fly-deploy.yml]
+
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - name: Skip when no Fly.io token is set
+        if: env.FLY_API_TOKEN == ''
+        run: echo "::notice::Add a FLY_API_TOKEN repository secret to deploy to Fly.io."
+      - uses: actions/checkout@v4
+        if: env.FLY_API_TOKEN != ''
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: env.FLY_API_TOKEN != ''
+      - name: Create the app on the first deploy
+        if: env.FLY_API_TOKEN != ''
+        run: |
+          APP=$(sed -n 's/^app = "\(.*\)"/\1/p' fly.toml)
+          flyctl status --app "$APP" >/dev/null 2>&1 || flyctl apps create "$APP" --org "${FLY_ORG:-personal}"
+      - name: Deploy
+        if: env.FLY_API_TOKEN != ''
+        run: flyctl deploy --remote-only --ha=false

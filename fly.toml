@@ -1,0 +1,18 @@
+# Fly.io app config. App names are unique across Fly.io, so change `app` if this one is taken.
+app = "bigbang-jis-seat-view"
+primary_region = "sin" # Singapore, the closest Fly.io region to Jakarta
+
+[build]
+  dockerfile = "Dockerfile"
+
+# One small machine that stops when nobody is visiting and starts again on the next request
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
