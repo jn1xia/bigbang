@@ -1407,7 +1407,8 @@ requestAnimationFrame(frame);
     document.head.appendChild(gc);
   }
 
-  var FLAG='bbjis.counted.v1',counted=false;
+  // If the browser blocks storage, only read the total, so reloads never count again
+  var FLAG='bbjis.counted.v1',counted=true;
   try{counted=localStorage.getItem(FLAG)==='1';}catch(e){}
   function call(path){
     var ctl=window.AbortController?new AbortController():null;
